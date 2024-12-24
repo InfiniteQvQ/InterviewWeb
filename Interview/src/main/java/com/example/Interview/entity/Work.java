@@ -1,4 +1,5 @@
 package com.example.Interview.entity;
+import java.util.Date;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -20,4 +21,10 @@ public class Work {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(name = "start_date", nullable = false)
+    private Date startDate;
+
+    @Column(name = "end_date")
+    private Date endDate;
 }

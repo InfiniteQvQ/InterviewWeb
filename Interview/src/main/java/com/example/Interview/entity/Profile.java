@@ -20,4 +20,8 @@ public class Profile {
     private Integer age;
     private String location;
     private String expectedSalary;
+
+    private String imageUrl;
+    private String description;
+    private Boolean isFullTime; 
 }

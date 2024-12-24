@@ -2,7 +2,7 @@ package com.example.Interview.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-
+import java.util.Date;
 @Entity
 @Table(name = "edu")
 @Data
@@ -18,5 +18,10 @@ public class Edu {
     private String schoolName;
     private String degree;
     private String major;
-    private Integer graduationYear;
+
+    @Column(name = "start_date", nullable = false)
+    private Date startDate;
+
+    @Column(name = "end_date")
+    private Date endDate;
 }

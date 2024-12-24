@@ -3,6 +3,7 @@ package com.example.Interview.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
@@ -17,6 +18,14 @@ public class WebConfig {
                         .allowedMethods("GET", "POST", "PUT", "DELETE")
                         .allowCredentials(true) 
                         .allowedHeaders("*"); 
+            }
+
+            @Override
+            public void addResourceHandlers(ResourceHandlerRegistry registry) {
+                
+                String imagePath = System.getProperty("user.home") + "/images/";
+                registry.addResourceHandler("/images/**")
+                        .addResourceLocations("file:" + imagePath);
             }
         };
     }
