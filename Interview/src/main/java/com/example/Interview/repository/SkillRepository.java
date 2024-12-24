@@ -10,5 +10,5 @@ import java.util.List;
 @Repository
 public interface SkillRepository extends JpaRepository<Skill, Long> {
     // 根据用户ID查询技能列表
-    List<Skill> findByUserId(Long userId);
+    List<Skill> findByUser(User user);
 }

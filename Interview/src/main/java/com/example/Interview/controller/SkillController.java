@@ -67,11 +67,11 @@ public class SkillController {
             return ResponseEntity.status(403).body(response);
         }
 
-        skill.setUser(user);
-        skillRepository.save(skill);
+        existingSkill.setSkillName(skill.getSkillName());
+        skillRepository.save(existingSkill);
         response.put("success", true);
         response.put("message", "技能更新成功");
-        response.put("skill", skill);
+        response.put("skill", existingSkill);
         return ResponseEntity.ok(response);
     }
 
@@ -103,7 +103,7 @@ public class SkillController {
             return ResponseEntity.status(403).body(response);
         }
 
-        skillRepository.deleteById(id);
+        skillRepository.delete(existingSkill);
         response.put("success", true);
         response.put("message", "技能删除成功");
         return ResponseEntity.ok(response);
@@ -121,7 +121,8 @@ public class SkillController {
             response.put("message", "未登录");
             return ResponseEntity.status(401).body(response);
         }
-        List<Skill> skills = skillRepository.findByUserId(user.getId());
+
+        List<Skill> skills = skillRepository.findByUser(user);
         response.put("success", true);
         response.put("message", "技能获取成功");
         response.put("skills", skills);
