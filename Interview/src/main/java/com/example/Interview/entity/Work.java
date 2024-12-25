@@ -27,4 +27,7 @@ public class Work {
 
     @Column(name = "end_date")
     private Date endDate;
+
+    @Column(name = "eval", length = 255)
+    private String eval;
 }
