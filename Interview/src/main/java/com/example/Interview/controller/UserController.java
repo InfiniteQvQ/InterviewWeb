@@ -32,7 +32,7 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody User loginUser, HttpSession session) {
+    public ResponseEntity<?> login(@RequestBody User loginUser) {
         Map<String, Object> response = new HashMap<>();
         User user = userRepository.findByUsername(loginUser.getUsername());
         if (user == null || !user.getPwd().equals(loginUser.getPwd())) {
@@ -40,7 +40,7 @@ public class UserController {
             response.put("message", "用户名或密码错误");
             return ResponseEntity.status(401).body(response);
         }
-        session.setAttribute("user", user);
+      
         response.put("success", true);
         response.put("message", "登录成功");
         response.put("user", user);
@@ -48,9 +48,15 @@ public class UserController {
     }
 
     @GetMapping("/logout")
-    public ResponseEntity<?> logout(HttpSession session) {
+    public ResponseEntity<?> logout(@RequestParam String username) {
         Map<String, Object> response = new HashMap<>();
-        session.invalidate();
+        User user = userRepository.findByUsername(username);
+        if (user == null) {
+            response.put("success", false);
+            response.put("message", "用户不存在或未登录");
+            return ResponseEntity.status(404).body(response);
+        }
+
         response.put("success", true);
         response.put("message", "登出成功");
         return ResponseEntity.ok(response);

@@ -3,6 +3,8 @@ package com.example.Interview.controller;
 import com.example.Interview.entity.Job;
 import com.example.Interview.entity.User;
 import com.example.Interview.repository.JobRepository;
+import com.example.Interview.repository.UserRepository;
+
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -30,13 +32,15 @@ public class JobController {
     @Autowired
     private JobRepository jobRepository;
 
+    @Autowired
+    private UserRepository userRepository;
     /**
      * 添加工作
      */
     @PostMapping("/add")
-    public ResponseEntity<?> addJob(@RequestBody Job job, HttpSession session) {
+    public ResponseEntity<?> addJob(@RequestBody Job job, @RequestParam String username) {
         Map<String, Object> response = new HashMap<>();
-        User user = (User) session.getAttribute("user");
+        User user = userRepository.findByUsername(username);
         if (user == null) {
             response.put("success", false);
             response.put("message", "未登录");
@@ -54,9 +58,9 @@ public class JobController {
      * 更新工作
      */
     @PutMapping("/update")
-    public ResponseEntity<?> updateJob(@RequestBody Job job, HttpSession session) {
+    public ResponseEntity<?> updateJob(@RequestBody Job job, @RequestParam String username) {
         Map<String, Object> response = new HashMap<>();
-        User user = (User) session.getAttribute("user");
+        User user = userRepository.findByUsername(username);
         if (user == null) {
             response.put("success", false);
             response.put("message", "未登录");
@@ -90,9 +94,9 @@ public class JobController {
      * 删除工作
      */
     @DeleteMapping("/delete/{id}")
-    public ResponseEntity<?> deleteJob(@PathVariable Long id, HttpSession session) {
+    public ResponseEntity<?> deleteJob(@PathVariable Long id, @RequestParam String username) {
         Map<String, Object> response = new HashMap<>();
-        User user = (User) session.getAttribute("user");
+        User user = userRepository.findByUsername(username);
         if (user == null) {
             response.put("success", false);
             response.put("message", "未登录");
@@ -124,9 +128,9 @@ public class JobController {
      * 列出当前用户的所有工作
      */
     @GetMapping("/list")
-    public ResponseEntity<?> listJobs(HttpSession session) {
+    public ResponseEntity<?> listJobs(@RequestParam String username) {
         Map<String, Object> response = new HashMap<>();
-        User user = (User) session.getAttribute("user");
+        User user = userRepository.findByUsername(username);
         if (user == null) {
             response.put("success", false);
             response.put("message", "未登录");
@@ -145,9 +149,9 @@ public class JobController {
      * 利用 ChatGPT 生成 JD
      */
     @PostMapping("/generate")
-    public ResponseEntity<?> generateJobDescription(@RequestBody Map<String, Object> request, HttpSession session) {
+    public ResponseEntity<?> generateJobDescription(@RequestBody Map<String, Object> request, @RequestParam String username) {
         Map<String, Object> response = new HashMap<>();
-        User user = (User) session.getAttribute("user");
+        User user = userRepository.findByUsername(username);
 
         if (user == null) {
             response.put("success", false);
