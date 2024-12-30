@@ -34,4 +34,7 @@ public class Job {
     
     @Column(name = "updated_at", nullable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
     private Timestamp updatedAt;
+
+    @Column(name = "requirement", nullable = false, columnDefinition = "TEXT")
+    private String requirement;
 }

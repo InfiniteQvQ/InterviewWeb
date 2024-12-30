@@ -181,17 +181,16 @@ public class JobController {
         try {
             Map<String, String> jdData = callChatGPTToGenerateJD(description);
             
-            Job job = new Job();
-            job.setUser(user);
-            job.setTitle(jdData.get("title"));
-            job.setDescription(jdData.get("description"));
-            job.setHourlyRate(hourlyRate);
-            job.setApplicantsCount(0); 
-            jobRepository.save(job);
+            Map<String, Object> job = new HashMap<>();
+            job.put("title", jdData.get("title"));
+            job.put("description", jdData.get("description"));
+            job.put("requirement", jdData.get("requirement"));
+            job.put("hourlyRate", hourlyRate);
 
             response.put("success", true);
             response.put("message", "JD 生成成功！");
             response.put("job", job);
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);
@@ -245,12 +244,104 @@ public class JobController {
     private String buildPrompt(String description) {
         return "根据以下描述生成一份岗位信息，输出严格按照 JSON 格式返回：\n" +
             "描述: \"" + description + "\"。\n" +
-            "返回内容只包含以下两个字段：\n" +
+            "返回内容只包含以下三个字段：\n" +
             "{\n" +
             "  \"title\": \"岗位名称\",\n" +
             "  \"description\": \"岗位描述\"\n" +
+            "  \"requirement\": \"任职要求\"\n" +
             "}\n" +
-            "不要返回任何其他内容，包括多余的文字或注释。岗位描述要考虑到这个岗位需要的所有能力。";
+            "不要返回任何其他内容，包括多余的文字或注释。岗位描述要考虑到这个岗位需要实现的内容，相当于Overview，任职要求要考虑到这个岗位需要的所有能力";
         }
+
+    
+    @PostMapping("/adjust")
+    public ResponseEntity<?> adjustJobField(@RequestBody Map<String, String> request, @RequestParam String username) {
+        Map<String, Object> response = new HashMap<>();
+        User user = userRepository.findByUsername(username);
+
+        if (user == null) {
+            response.put("success", false);
+            response.put("message", "未登录");
+            return ResponseEntity.status(401).body(response);
+        }
+
+        String field = request.get("field");
+        String originalContent = request.get("originalContent");
+        String improvementPoints = request.get("improvementPoints");
+
+        if (field == null || originalContent == null || improvementPoints == null || improvementPoints.isEmpty()) {
+            response.put("success", false);
+            response.put("message", "字段名、原始内容和改进点不能为空！");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        if (!field.equals("description") && !field.equals("requirement")) {
+            response.put("success", false);
+            response.put("message", "仅支持调整 description 或 requirement 字段！");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        try {
+            // 调用 ChatGPT 生成新的字段内容
+            String adjustedContent = callChatGPTToAdjustField(field, originalContent, improvementPoints);
+
+            response.put("success", true);
+            response.put("message", "字段调整成功！");
+            response.put("adjustedContent", adjustedContent);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "调用 ChatGPT 接口失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    private String callChatGPTToAdjustField(String field, String originalContent, String improvementPoints) throws Exception {
+        // 准备请求体
+        Map<String, Object> message = new HashMap<>();
+        message.put("role", "user");
+        message.put("content", buildFieldAdjustmentPrompt(field, originalContent, improvementPoints));
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "chatgpt-4o-latest");
+        requestBody.put("messages", List.of(message));
+        requestBody.put("temperature", 0.7);
+        requestBody.put("max_tokens", 300);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + OPENAI_API_KEY);
+        headers.set("Content-Type", "application/json");
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        ResponseEntity<String> response = restTemplate.exchange(
+            CHATGPT_API_URL, HttpMethod.POST, entity, String.class
+        );
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode responseJson = objectMapper.readTree(response.getBody());
+        String content = responseJson.get("choices").get(0).get("message").get("content").asText().trim();
+        if (content.startsWith("\"")) {
+            content = content.substring(1).trim();
+        }
+        if (content.endsWith("\"")) {
+            content = content.substring(0, content.length() - 1).trim();
+        }
+
+        return responseJson.get("choices").get(0).get("message").get("content").asText().trim();
+    }
+
+    private String buildFieldAdjustmentPrompt(String field, String originalContent, String improvementPoints) {
+        String fieldDescription = field.equals("overview") 
+            ? "这是岗位的概述内容，它需要描述岗位的主要职责和目标" 
+            : "这是岗位的任职要求，它需要描述岗位所需的技能和资格";
+
+        return "以下是岗位字段的原始内容和用户的改进点，请结合两者生成新的字段信息，主要侧重用户想更改的内容：" +
+               "\n字段类型: " + fieldDescription +
+               "\n原始内容: \"" + originalContent + "\"" +
+               "\n改进点: \"" + improvementPoints + "\"" +
+               "\n请根据上述内容生成更新后的字段信息，输出严格按照文本格式返回, 文字只包含新的字段类型所应该拥有的信息,不要包含任何额外注释或解释!";
+    }
 
 }
