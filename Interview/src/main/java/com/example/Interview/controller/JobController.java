@@ -4,6 +4,15 @@ import com.example.Interview.entity.Job;
 import com.example.Interview.entity.User;
 import com.example.Interview.repository.JobRepository;
 import com.example.Interview.repository.UserRepository;
+import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.web.client.ResponseExtractor;
+import javax.servlet.http.HttpServletResponse;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import java.util.concurrent.CompletableFuture;
 
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +37,7 @@ public class JobController {
 
     private final String OPENAI_API_KEY =  System.getenv("INT_JD_KEY");
     private final String CHATGPT_API_URL = "https://api.openai.com/v1/chat/completions";
+    private final String CHAT_KEY = System.getenv("INT_CHAT_KEY");
 
     @Autowired
     private JobRepository jobRepository;
@@ -329,7 +339,7 @@ public class JobController {
             content = content.substring(0, content.length() - 1).trim();
         }
 
-        return responseJson.get("choices").get(0).get("message").get("content").asText().trim();
+        return content;
     }
 
     private String buildFieldAdjustmentPrompt(String field, String originalContent, String improvementPoints) {
@@ -342,6 +352,96 @@ public class JobController {
                "\n原始内容: \"" + originalContent + "\"" +
                "\n改进点: \"" + improvementPoints + "\"" +
                "\n请根据上述内容生成更新后的字段信息，输出严格按照文本格式返回, 文字只包含新的字段类型所应该拥有的信息,不要包含任何额外注释或解释!";
+    }
+
+    
+
+    @GetMapping(value = "/chatbot", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter queryChatbot(@RequestParam("query") String userQuery) {
+        SseEmitter emitter = new SseEmitter();
+        CompletableFuture.runAsync(() -> {
+            try {
+                callChatGPTBot(userQuery, emitter); // 调用 ChatGPT 流式方法
+            } catch (Exception e) {
+                emitter.completeWithError(e); // 异常处理
+            }
+        });
+        return emitter;
+    }
+
+
+    private void callChatGPTBot(String userQuery , SseEmitter emitter)  throws Exception {
+        Map<String, Object> userMessage = new HashMap<>();
+        userMessage.put("role", "user");
+        userMessage.put("content", userQuery);
+
+        Map<String, Object> systemMessage = new HashMap<>();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", "你是一个智能职业规划和职业发展咨询助手，答案控制在200个token内，请针对用户提出的问题，作出符合职业规划以及发展的回答，输出严格按照文本格式返回, 文字只包含回答信息,不要包含任何额外注释或解释!");
+        List<Map<String, Object>> messages = new ArrayList<>();
+        messages.add(systemMessage);
+        messages.add(userMessage);
+        // 请求体
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "chatgpt-4o-latest");
+        requestBody.put("messages", messages);
+        requestBody.put("temperature", 0.7);
+        requestBody.put("max_tokens", 300);
+        requestBody.put("stream", true);
+
+        // 设置请求头
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + CHAT_KEY);
+        headers.set("Content-Type", "application/json");
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        ResponseExtractor<Void> responseExtractor = (ClientHttpResponse response) -> {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.getBody(), StandardCharsets.UTF_8))) {
+                String line;
+                StringBuilder contentBuilder = new StringBuilder();
+
+                while ((line = reader.readLine()) != null) {
+                    if (line.equals("data: [DONE]")) {
+                        // 结束流式传输
+                        emitter.send(SseEmitter.event().data("[DONE]"));
+                        emitter.complete();
+                        break; // 跳出循环，避免继续读取
+                    }
+                    if (line.startsWith("data: ") ) {
+                        String data = line.substring(6).trim();
+
+                        
+                        JsonNode jsonNode = new ObjectMapper().readTree(data);
+
+                        // 提取 delta.content 内容
+                        JsonNode delta = jsonNode.path("choices").get(0).path("delta").path("content");
+                        if (!delta.isMissingNode()) {
+                            String content = delta.asText();
+                       
+
+                            contentBuilder.append(content);
+
+                            // 将提取的文字发送给客户端
+                            emitter.send(SseEmitter.event().data(content));
+                        }
+                    }
+                }
+                emitter.complete(); // 完成 SSe
+
+            } catch (Exception e) {
+
+                emitter.completeWithError(e); // 异常处理
+            }
+            return null;
+        };
+
+        restTemplate.execute(CHATGPT_API_URL, HttpMethod.POST, request -> {
+            Map<String, String> singleValueMap = headers.toSingleValueMap();
+            singleValueMap.forEach(request.getHeaders()::add);
+            new ObjectMapper().writeValue(request.getBody(), requestBody);
+        }, responseExtractor);
     }
 
 }

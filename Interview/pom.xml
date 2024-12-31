@@ -61,6 +61,7 @@
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
 		</dependency>
+	
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
@@ -83,6 +84,14 @@
         	<artifactId>jakarta.annotation-api</artifactId>
         	<version>2.1.1</version>
     	</dependency>
+
+		<dependency>
+			<groupId>javax.servlet</groupId>
+			<artifactId>javax.servlet-api</artifactId>
+			<version>4.0.1</version> <!-- 可根据您的项目需求调整版本 -->
+			<scope>provided</scope>
+		</dependency>
+
 	</dependencies>
 
 	<build>
