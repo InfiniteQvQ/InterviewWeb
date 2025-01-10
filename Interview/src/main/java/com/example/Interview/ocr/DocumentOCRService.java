@@ -18,7 +18,7 @@ public class DocumentOCRService {
 
     public DocumentOCRService() {
         // 设置 GOOGLE_APPLICATION_CREDENTIALS 环境变量
-        String credentialsPath = "src/main/resources/solosync-50168d2371b2.json";
+        String credentialsPath = "src/main/resources/solosync-15708ffbd26e.json";
         System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", new File(credentialsPath).getAbsolutePath());
 
     }

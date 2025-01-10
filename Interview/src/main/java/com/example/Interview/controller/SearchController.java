@@ -339,4 +339,37 @@ public class SearchController {
            "For the 'degree' key, use only one of these values: '不限', '本科', '硕士', '博士'. " +
            "Leave any key as null if it is not explicitly mentioned in the query.";
     }
+
+
+
+    @GetMapping("/finduser")
+    public ResponseEntity<?> getUserDetailsByUsername(@RequestParam String username) {
+        // 查找用户
+        System.out.println("start" + username);
+        User user = userRepository.findByUsername(username);
+        if (user == null) {
+            System.out.println("not find");
+            return ResponseEntity.status(404).body("用户未找到");
+        }
+
+        // 获取用户的 Profile、工作经历、技能和教育信息
+        Profile profile = profileRepository.findByUser(user);
+        List<Work> workExperience = workRepository.findByUser(user);
+        System.out.println(workExperience);
+        List<Skill> skills = skillRepository.findByUser(user);
+        List<Edu> education = eduRepository.findByUser(user);
+        int exp = calculateTotalExperience(user);
+        
+        System.out.println(exp);
+        // 构造返回数据
+        Map<String, Object> userDetails = new HashMap<>();
+        userDetails.put("profile", profile);
+        userDetails.put("workExperience", workExperience);
+        userDetails.put("skills", skills);
+        userDetails.put("education", education);
+        userDetails.put("exp", exp);
+
+        return ResponseEntity.ok(userDetails);
+    }
+
 }

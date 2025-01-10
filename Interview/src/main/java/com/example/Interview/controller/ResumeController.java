@@ -4,6 +4,7 @@ import com.example.Interview.ocr.DocumentOCRService;
 import com.example.Interview.repository.EduRepository;
 import com.example.Interview.repository.ProfileRepository;
 import com.example.Interview.repository.SkillRepository;
+import com.example.Interview.repository.UserRepository;
 import com.example.Interview.repository.WorkRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,9 +14,14 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+
+import org.springframework.transaction.annotation.Transactional;
+import com.example.Interview.entity.*;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 @RestController
@@ -23,6 +29,7 @@ import java.util.*;
 public class ResumeController {
 
     private final String OPENAI_API_KEY = System.getenv("INT_DP_RES_KEY");
+    private final String INT_DP_EVAL_KEY = System.getenv("INT_DP_EVAL_KEY");
     private final String CHATGPT_API_URL = "https://api.deepseek.com/chat/completions";
 
     @Autowired
@@ -39,6 +46,9 @@ public class ResumeController {
 
     @Autowired
     private DocumentOCRService documentOCRService; // 注入 OCR 服务
+
+    @Autowired
+    private UserRepository userRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -313,4 +323,319 @@ public class ResumeController {
         //
         // 同样适用于 edu、work、skills、projects
     }
+
+
+
+
+    @PostMapping("/add")
+    @Transactional
+    public ResponseEntity<?> addResume(@RequestBody Map<String, Object> resumeData) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // 解析并获取 profile 数据
+            Map<String, Object> profileMap = (Map<String, Object>) resumeData.get("profile");
+            if (profileMap == null) {
+                response.put("success", false);
+                response.put("message", "Profile 信息不能为空！");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+            // 获取 user_id
+            Object userIdObj = profileMap.get("user_id");
+            if (userIdObj == null) {
+                response.put("success", false);
+                response.put("message", "user_id 不能为空！");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+            Long userId = Long.parseLong(userIdObj.toString());
+
+            // 查找 User 实体
+            Optional<User> userOptional = userRepository.findById(userId);
+            if (!userOptional.isPresent()) {
+                response.put("success", false);
+                response.put("message", "用户不存在！");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+            User user = userOptional.get();
+
+            // 保存 Profile
+            Profile profile = new Profile();
+            profile.setUser(user);
+            profile.setPhone((String) profileMap.get("phone"));
+            profile.setGender((String) profileMap.get("gender"));
+            profile.setAge(profileMap.get("age") != null ? Integer.parseInt(profileMap.get("age").toString()) : null);
+            profile.setLocation((String) profileMap.get("location"));
+            profile.setExpectedSalary((String) profileMap.get("expected_salary"));
+            profile.setDescription((String) profileMap.get("description"));
+            profile.setIsFullTime(profileMap.get("is_full_time") != null && (Boolean) profileMap.get("is_full_time"));
+            profileRepository.save(profile);
+
+            // 解析并保存 Edu 数据
+            List<Map<String, Object>> eduList = (List<Map<String, Object>>) resumeData.get("edu");
+            if (eduList != null) {
+                for (Map<String, Object> eduMap : eduList) {
+                    Edu edu = new Edu();
+                    edu.setUser(user);
+                    edu.setSchoolName((String) eduMap.get("school_name"));
+                    edu.setDegree((String) eduMap.get("degree"));
+                    edu.setMajor((String) eduMap.get("major"));
+                    edu.setStartDate(parseDate(eduMap.get("start_date")));
+                    edu.setEndDate(parseDate(eduMap.get("end_date")));
+                    edu.setEval((String) eduMap.get("eval"));
+                    eduRepository.save(edu);
+                }
+            }
+
+            // 解析并保存 Work 数据
+            List<Map<String, Object>> workList = (List<Map<String, Object>>) resumeData.get("work");
+            if (workList != null) {
+                for (Map<String, Object> workMap : workList) {
+                    Work work = new Work();
+                    work.setUser(user);
+                    work.setCompanyName((String) workMap.get("company_name"));
+                    work.setPosition((String) workMap.get("position"));
+                    work.setDescription((String) workMap.get("description"));
+                    work.setStartDate(parseDate(workMap.get("start_date")));
+                    work.setEndDate(parseDate(workMap.get("end_date")));
+                    work.setEval((String) workMap.get("eval"));
+                    workRepository.save(work);
+                }
+            }
+
+            // 解析并保存 Skills 数据
+            List<Map<String, Object>> skillsList = (List<Map<String, Object>>) resumeData.get("skills");
+            if (skillsList != null) {
+                for (Map<String, Object> skillMap : skillsList) {
+                    Skill skill = new Skill();
+                    skill.setUser(user);
+                    skill.setSkillName((String) skillMap.get("skill_name"));
+                    skillRepository.save(skill);
+                }
+            }
+
+            response.put("success", true);
+            response.put("message", "简历信息保存成功！");
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.put("success", false);
+            response.put("message", "保存简历信息失败：" + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * 辅助方法：将字符串日期转换为 Date 对象。
+     *
+     * @param dateObj 字符串日期，可能是 yyyy-MM 或 yyyy-MM-dd
+     * @return Date 对象，如果输入为空或格式不正确，返回 null
+     */
+    private Date parseDate(Object dateObj) {
+        if (dateObj == null) {
+            return null;
+        }
+        String dateStr = dateObj.toString();
+        if (dateStr.isEmpty()) {
+            return null;
+        }
+
+        SimpleDateFormat sdf;
+        if (dateStr.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            sdf = new SimpleDateFormat("yyyy-MM-dd");
+        } else if (dateStr.matches("\\d{4}-\\d{2}")) {
+            sdf = new SimpleDateFormat("yyyy-MM");
+        } else if (dateStr.matches("\\d{4}")) {
+            sdf = new SimpleDateFormat("yyyy");
+        } else {
+            // 不支持的日期格式
+            return null;
+        }
+
+        sdf.setLenient(false);
+        try {
+            return sdf.parse(dateStr);
+        } catch (ParseException e) {
+            // 日期格式不正确
+            return null;
+        }
+    }
+
+     @PostMapping("/check")
+    public ResponseEntity<?> checkResumeData(@RequestBody Map<String, Object> requestBody) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            String username = (String) requestBody.get("username");
+
+            if (username == null || username.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("hasData", false);
+                response.put("message", "username 不能为空！");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+            // 查找 User 实体，返回 User 或 null
+            User user = userRepository.findByUsername(username);
+            if (user == null) {
+                response.put("success", false);
+                response.put("hasData", false);
+                response.put("message", "用户不存在！");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+            // 查找 Profile 实体，返回 Profile 或 null
+            Profile profile = profileRepository.findByUser(user);
+            boolean hasData = profile != null;
+
+            response.put("success", true);
+            response.put("hasData", hasData);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.put("success", false);
+            response.put("hasData", false);
+            response.put("message", "检查简历数据失败：" + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @PostMapping("/evaluate-resume")
+    public ResponseEntity<Map<String, Object>> evaluateResume(@RequestBody Map<String, Object> requestData) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // Step 1: 构建评分的提示语
+            String resumeContent = buildEvalPrompt(requestData);
+
+            // Step 2: 调用 ChatGPT API 进行评分
+            String gptResponse = callRESGPT(resumeContent);
+
+            if (gptResponse.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "ChatGPT 未返回有效内容！");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            }
+
+            // Step 3: 解析 ChatGPT 的响应为 JSON
+            Map<String, Object> evaluationResult = parseRESResponse(gptResponse);
+
+            if (evaluationResult.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "解析后的评分数据为空！");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            }
+
+            // Step 4: 返回评分数据和亮点
+            response.put("success", true);
+            response.put("message", "简历评分成功！");
+            response.put("data", evaluationResult);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.put("success", false);
+            response.put("message", "简历评分失败：" + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    private String buildEvalPrompt(Map<String, Object> requestData) {
+        try {
+            return "请根据以下简历内容，从语法、精确度、简历的影响力和结构四个角度分别进行评分（0-100分），并返回如下格式的 JSON 数据：\n" +
+                    "{\n" +
+                    "  \"grammar\": { \"score\": 分数, \"details\": \"语法得分的详细原因, 使用一些优秀简历里出现的词会更高分\" },\n" +
+                    "  \"brevity\": { \"score\": 分数, \"details\": \"简明得分的详细原因，要看语言的质量是否能有效传达信息\" },\n" +
+                    "  \"impact\": { \"score\": 分数, \"details\": \"简历的影响力得分的详细原因，把你想成面试官，根据这个简历给你的冲击力来打分\" },\n" +
+                    "  \"sections\": { \"score\": 分数, \"details\": \"结构得分的详细原因,打分也要基于这个简历和大部分简历内容长度的比较\" },\n" +
+                    "  \"overallEvaluation\": \"整体评估的详细描述\",\n" +
+                    "  \"highlights\": [\n" +
+                    "    {\"summary\": \"亮点概述\", \"details\": \"亮点的详细描述\"},\n" +
+                    "    {\"summary\": \"亮点概述\", \"details\": \"亮点的详细描述\"},\n" +
+                    "    {\"summary\": \"亮点概述\", \"details\": \"亮点的详细描述\"}\n" +
+                    "  ]\n" +
+                    "}\n" +
+                    "其中 得分只有40 60 80 100，详细原因和描述不要带主语，内容详细一些， 简历内容如下：\n" +
+                    objectMapper.writeValueAsString(requestData) ;
+        } catch (Exception e) {
+            // 记录错误日志
+            System.err.println("构建评分提示语失败：" + e.getMessage());
+            // 根据需求，可以选择返回一个默认值或者抛出一个运行时异常
+            throw new RuntimeException("构建评分提示语失败", e);
+        }
+    }
+
+    private String callRESGPT(String prompt) throws Exception {
+        if (prompt.isEmpty()) {
+            return "";
+        }
+        System.out.println("Sending request to OpenAI API with prompt: " + prompt);
+
+        // 构建消息体
+        Map<String, Object> message = new HashMap<>();
+        message.put("role", "user");
+        message.put("content", prompt);
+
+        // 构建请求体
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "deepseek-chat");
+        requestBody.put("messages", List.of(message));
+        requestBody.put("temperature", 0.7);
+        requestBody.put("max_tokens", 1000);
+
+        // 设置请求头
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + INT_DP_EVAL_KEY);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // 创建 RestTemplate 实例
+        RestTemplate restTemplate = new RestTemplate();
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+
+        // 发送 POST 请求
+        ResponseEntity<String> response = restTemplate.exchange(
+                CHATGPT_API_URL, HttpMethod.POST, entity, String.class
+        );
+
+        // 检查响应状态码
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("调用 EVAL API 失败：HTTP " + response.getStatusCodeValue() + " - " + response.getBody());
+        }
+
+        // 解析响应内容
+        JsonNode responseJson = objectMapper.readTree(response.getBody());
+        String nestedJsonContent = responseJson
+                .path("choices")
+                .get(0)
+                .path("message")
+                .path("content")
+                .asText()
+                .trim();
+
+        // 处理 ChatGPT 响应内容
+        if (nestedJsonContent.startsWith("```json")) {
+            nestedJsonContent = nestedJsonContent.substring(7).trim();
+        }
+        if (nestedJsonContent.endsWith("```")) {
+            nestedJsonContent = nestedJsonContent.substring(0, nestedJsonContent.length() - 3).trim();
+        }
+
+        System.out.println("处理后的 DP 响应内容：\n" + nestedJsonContent);
+        return nestedJsonContent;
+    }
+
+    private Map<String, Object> parseRESResponse(String gptResponse) {
+        Map<String, Object> parsedData = new HashMap<>();
+        try {
+            JsonNode jsonNode = objectMapper.readTree(gptResponse);
+            parsedData = objectMapper.convertValue(jsonNode, Map.class);
+        } catch (Exception e) {
+            System.err.println("解析 EVAL 响应失败：" + e.getMessage());
+            e.printStackTrace();
+        }
+        return parsedData;
+    }
+
+
 }
