@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/resume")
@@ -637,5 +638,206 @@ public class ResumeController {
         return parsedData;
     }
 
+
+    @PutMapping("/update")
+    @Transactional
+    public ResponseEntity<?> updateResume(@RequestBody Map<String, Object> resumeData) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // Step 1: 提取 username
+            String username = (String) resumeData.get("username");
+            if (username == null || username.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "用户名不能为空！");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+            // Step 2: 根据 username 查找 User 实体
+            User user = userRepository.findByUsername(username);
+
+            // Step 3: 更新 Profile
+            Map<String, Object> profileMap = (Map<String, Object>) resumeData.get("profile");
+            if (profileMap != null) {
+                Profile profile = profileRepository.findByUser(user);
+                if (profile == null) {
+                    // 如果 Profile 不存在，则创建新的 Profile
+                    profile = new Profile();
+                    profile.setUser(user);
+                }
+                // 更新 Profile 字段
+                profile.setPhone((String) profileMap.get("phone"));
+                profile.setAge(profileMap.get("age") != null ? Integer.parseInt(profileMap.get("age").toString()) : null);
+                profile.setLocation((String) profileMap.get("location"));
+                profile.setDescription((String) profileMap.get("summary"));
+                profileRepository.save(profile);
+            }
+
+            // Step 4: 更新 Education
+            List<Map<String, Object>> eduList = (List<Map<String, Object>>) resumeData.get("education");
+            if (eduList != null) {
+                // 获取现有的教育经历
+                List<Edu> existingEdu = eduRepository.findByUser(user);
+                Map<Long, Edu> existingEduMap = existingEdu.stream()
+                        .collect(Collectors.toMap(Edu::getId, edu -> edu));
+
+                List<Edu> updatedEdu = new ArrayList<>();
+
+                for (Map<String, Object> eduMap : eduList) {
+                    Long eduId = eduMap.get("id") != null ? Long.parseLong(eduMap.get("id").toString()) : null;
+                    Edu edu;
+                    if (eduId != null && existingEduMap.containsKey(eduId)) {
+                        // 更新现有的教育经历
+                        edu = existingEduMap.get(eduId);
+                        existingEduMap.remove(eduId); // 从 Map 中移除，以便后续删除
+                    } else {
+                        // 创建新的教育经历
+                        edu = new Edu();
+                        edu.setUser(user);
+                    }
+                    // 更新字段
+                    edu.setSchoolName((String) eduMap.get("schoolName"));
+                    edu.setDegree((String) eduMap.get("degree"));
+                    edu.setMajor((String) eduMap.get("major"));
+                    edu.setStartDate(parseDateUpdate(eduMap.get("startDate")));
+                    edu.setEndDate(parseDate(eduMap.get("endDate")));
+                    edu.setEval((String) eduMap.get("eval"));
+                    updatedEdu.add(edu);
+                }
+
+                // 保存或更新教育经历
+                eduRepository.saveAll(updatedEdu);
+
+                // 删除不再存在的教育经历
+                for (Edu eduToDelete : existingEduMap.values()) {
+                    eduRepository.delete(eduToDelete);
+                }
+            }
+
+            // Step 5: 更新 Work Experience
+            List<Map<String, Object>> workList = (List<Map<String, Object>>) resumeData.get("workExperience");
+            if (workList != null) {
+                // 获取现有的工作经历
+                List<Work> existingWork = workRepository.findByUser(user);
+                Map<Long, Work> existingWorkMap = existingWork.stream()
+                        .collect(Collectors.toMap(Work::getId, work -> work));
+
+                List<Work> updatedWork = new ArrayList<>();
+
+                for (Map<String, Object> workMap : workList) {
+                    Long workId = workMap.get("id") != null ? Long.parseLong(workMap.get("id").toString()) : null;
+                    Work work;
+                    if (workId != null && existingWorkMap.containsKey(workId)) {
+                        // 更新现有的工作经历
+                        work = existingWorkMap.get(workId);
+                        existingWorkMap.remove(workId); // 从 Map 中移除，以便后续删除
+                    } else {
+                        // 创建新的工作经历
+                        work = new Work();
+                        work.setUser(user);
+                    }
+                    // 更新字段
+                    work.setCompanyName((String) workMap.get("companyName"));
+                    work.setPosition((String) workMap.get("position"));
+                    work.setDescription((String) workMap.get("description"));
+                    work.setStartDate(parseDateUpdate(workMap.get("startDate")));
+                    work.setEndDate(parseDate(workMap.get("endDate")));
+                    work.setEval((String) workMap.get("eval"));
+                    updatedWork.add(work);
+                }
+
+                // 保存或更新工作经历
+                workRepository.saveAll(updatedWork);
+
+                // 删除不再存在的工作经历
+                for (Work workToDelete : existingWorkMap.values()) {
+                    workRepository.delete(workToDelete);
+                }
+            }
+
+            // Step 6: 更新 Skills
+            List<Map<String, Object>> skillsList = (List<Map<String, Object>>) resumeData.get("skills");
+            if (skillsList != null) {
+                // 获取现有的技能
+                List<Skill> existingSkills = skillRepository.findByUser(user);
+                Set<String> existingSkillNames = existingSkills.stream()
+                        .map(Skill::getSkillName)
+                        .collect(Collectors.toSet());
+
+                Set<String> updatedSkillNames = skillsList.stream()
+                        .map(skillMap -> (String) skillMap.get("skillName"))
+                        .collect(Collectors.toSet());
+
+                // 确定需要添加的技能
+                Set<String> skillsToAdd = new HashSet<>(updatedSkillNames);
+                skillsToAdd.removeAll(existingSkillNames);
+
+                // 确定需要删除的技能
+                Set<String> skillsToRemove = new HashSet<>(existingSkillNames);
+                skillsToRemove.removeAll(updatedSkillNames);
+
+                // 添加新技能
+                for (String skillName : skillsToAdd) {
+                    Skill skill = new Skill();
+                    skill.setUser(user);
+                    skill.setSkillName(skillName);
+                    skillRepository.save(skill);
+                }
+
+                // 删除不再存在的技能
+                for (Skill skill : existingSkills) {
+                    if (skillsToRemove.contains(skill.getSkillName())) {
+                        skillRepository.delete(skill);
+                    }
+                }
+            }
+
+            response.put("success", true);
+            response.put("message", "简历信息更新成功！");
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.put("success", false);
+            response.put("message", "更新简历信息失败：" + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * 辅助方法：将字符串日期转换为 Date 对象。
+     *
+     * @param dateObj 字符串日期，可能是 yyyy-MM 或 yyyy-MM-dd
+     * @return Date 对象，如果输入为空或格式不正确，返回 null
+     */
+    private Date parseDateUpdate(Object dateObj) {
+        if (dateObj == null) {
+            return null;
+        }
+        String dateStr = dateObj.toString();
+        if (dateStr.isEmpty()) {
+            return null;
+        }
+
+        SimpleDateFormat sdf;
+        if (dateStr.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            sdf = new SimpleDateFormat("yyyy-MM-dd");
+        } else if (dateStr.matches("\\d{4}-\\d{2}")) {
+            sdf = new SimpleDateFormat("yyyy-MM");
+        } else if (dateStr.matches("\\d{4}")) {
+            sdf = new SimpleDateFormat("yyyy");
+        } else {
+            // 不支持的日期格式
+            return null;
+        }
+
+        sdf.setLenient(false);
+        try {
+            return sdf.parse(dateStr);
+        } catch (ParseException e) {
+            // 日期格式不正确
+            return null;
+        }
+    }
 
 }

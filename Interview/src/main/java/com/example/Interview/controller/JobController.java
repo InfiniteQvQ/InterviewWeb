@@ -37,7 +37,10 @@ public class JobController {
 
     private final String OPENAI_API_KEY =  System.getenv("INT_JD_KEY");
     private final String CHATGPT_API_URL = "https://api.openai.com/v1/chat/completions";
-    private final String CHAT_KEY = System.getenv("INT_CHAT_KEY");
+    //private final String CHAT_KEY = System.getenv("INT_CHAT_KEY");
+    private final String CHAT_KEY = System.getenv("INT_FG_CHAT_KEY");
+    private final String FASTGPT_CHATGPT_API_URL = "https://api.fastgpt.in/api/v1/chat/completions";
+    
 
     @Autowired
     private JobRepository jobRepository;
@@ -377,16 +380,16 @@ public class JobController {
 
         Map<String, Object> systemMessage = new HashMap<>();
         systemMessage.put("role", "system");
-        systemMessage.put("content", "你是一个智能职业规划和职业发展咨询助手，答案控制在200个token内，请针对用户提出的问题，作出符合职业规划以及发展的回答，输出严格按照文本格式返回, 文字只包含回答信息,不要包含任何额外注释或解释!");
+        systemMessage.put("content", "你是一个智能职业规划和职业发展咨询助手，请针对用户提出的问题，作出符合职业规划以及发展的回答，回答在400个token左右，输出严格按照文本格式返回, 文字只包含回答信息,不要包含任何额外注释或解释!");
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(systemMessage);
         messages.add(userMessage);
         // 请求体
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "chatgpt-4o-latest");
+        requestBody.put("model", "");
         requestBody.put("messages", messages);
         requestBody.put("temperature", 0.7);
-        requestBody.put("max_tokens", 300);
+        requestBody.put("max_tokens", 600);
         requestBody.put("stream", true);
 
         // 设置请求头
@@ -437,7 +440,7 @@ public class JobController {
             return null;
         };
 
-        restTemplate.execute(CHATGPT_API_URL, HttpMethod.POST, request -> {
+        restTemplate.execute(FASTGPT_CHATGPT_API_URL, HttpMethod.POST, request -> {
             Map<String, String> singleValueMap = headers.toSingleValueMap();
             singleValueMap.forEach(request.getHeaders()::add);
             new ObjectMapper().writeValue(request.getBody(), requestBody);
