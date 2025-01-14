@@ -24,7 +24,7 @@ public class PostController {
     @Autowired
     private UserRepository userRepository; // 添加 UserRepository
 
-    private final String UPLOAD_DIR = System.getProperty("user.home") + "/Desktop/photos/";
+   
 
 
     @GetMapping
@@ -75,7 +75,7 @@ public class PostController {
             image.transferTo(new File(filePath));
 
         
-            imageUrl = "/api/images/" + user.getUsername() + "/" + uniqueFileName;
+            imageUrl = "/images/" + user.getUsername() + "/" + uniqueFileName;
         }
 
         // 4. 创建帖子对象
