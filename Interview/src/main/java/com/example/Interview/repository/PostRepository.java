@@ -13,5 +13,5 @@ import com.example.Interview.entity.Post;
 
 @Repository
 public interface PostRepository extends JpaRepository<Post, Long> {
-    Page<Post> findAll(PageRequest pageRequest);
+     Page<Post> findAll(Pageable pageable);
 }
