@@ -21,8 +21,19 @@ public class CommentController {
     }
 
     // 创建评论
-    @PostMapping
+   @PostMapping
     public Comment createComment(@RequestBody Comment comment) {
+        // Find the user by username
+        User user = userRepository.findByUsername(comment.getUsername());
+        if (user == null) {
+            throw new RuntimeException("User not found with username: " + comment.getUsername());
+        }
+
+        // Set the user and post for the comment
+        comment.setUser(user);
+        comment.setPost(postRepository.findById(comment.getPost().getPostId())
+                            .orElseThrow(() -> new RuntimeException("Post not found")));
+
         return commentRepository.save(comment);
     }
 
