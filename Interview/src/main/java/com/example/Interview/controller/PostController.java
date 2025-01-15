@@ -6,6 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.data.domain.Pageable;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,9 +33,9 @@ public class PostController {
 
     @GetMapping
     public List<Post> getAllPosts(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        // 按创建时间降序排序，并限制最多20个帖子
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt")));
-        return postRepository.findAll(pageRequest).getContent();
+        // 创建分页请求并按时间排序
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt")));
+        return postRepository.findAll(pageable).getContent();
     }
 
     @PostMapping(consumes = {"multipart/form-data"})
