@@ -27,6 +27,9 @@ public class Post {
 
     private String imagePath;
 
+    @Column(nullable = false, columnDefinition = "VARCHAR(255) DEFAULT 'all'")
+    private String com;
+
     @Column(nullable = false, columnDefinition = "int default 0")
     private int likes;
 
