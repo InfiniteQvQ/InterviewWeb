@@ -24,7 +24,7 @@ public class CommentController {
 
     @Autowired
     private PostRepository postRepository;
-    
+
     // 获取某个帖子的所有评论
     @GetMapping("/post/{postId}")
     public List<Comment> getCommentsByPostId(@PathVariable Long postId) {
@@ -33,17 +33,20 @@ public class CommentController {
 
     // 创建评论
    @PostMapping
-    public Comment createComment(@RequestBody Comment comment) {
+    public Comment createComment(@RequestParam("username") String username, @RequestBody Comment comment) {
         // Find the user by username
-        User user = userRepository.findByUsername(comment.getUsername());
+        User user = userRepository.findByUsername(username);
         if (user == null) {
             throw new RuntimeException("User not found with username: " + comment.getUsername());
         }
 
         // Set the user and post for the comment
+        Post post = postRepository.findById(comment.getPost().getPostId())
+                    .orElseThrow(() -> new RuntimeException("Post not found"));
+
+        // Set the user and post for the comment
         comment.setUser(user);
-        comment.setPost(postRepository.findById(comment.getPost().getPostId())
-                            .orElseThrow(() -> new RuntimeException("Post not found")));
+        comment.setPost(post);
 
         return commentRepository.save(comment);
     }
