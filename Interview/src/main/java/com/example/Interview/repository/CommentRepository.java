@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
     // 根据 Post 的 ID 查找评论
-    List<Comment> findByPost_PostId(Long postId);
+    public List<Comment> findByPost_Id(Long postId);
 }
