@@ -19,7 +19,7 @@ public class CommentController {
     @Autowired
     private CommentRepository commentRepository;
 
-     @Autowired
+    @Autowired
     private UserRepository userRepository; 
 
     @Autowired
