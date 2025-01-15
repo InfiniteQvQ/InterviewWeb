@@ -7,6 +7,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import com.example.Interview.entity.Post;
+import com.example.Interview.entity.User;
+import com.example.Interview.repository.PostRepository;
+import com.example.Interview.repository.UserRepository;
+
 @RestController
 @RequestMapping("/comments")
 public class CommentController {
@@ -14,6 +19,12 @@ public class CommentController {
     @Autowired
     private CommentRepository commentRepository;
 
+     @Autowired
+    private UserRepository userRepository; 
+
+    @Autowired
+    private PostRepository postRepository;
+    
     // 获取某个帖子的所有评论
     @GetMapping("/post/{postId}")
     public List<Comment> getCommentsByPostId(@PathVariable Long postId) {
