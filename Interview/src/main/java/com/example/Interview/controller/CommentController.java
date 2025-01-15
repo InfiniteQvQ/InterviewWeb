@@ -13,7 +13,7 @@ import com.example.Interview.repository.PostRepository;
 import com.example.Interview.repository.UserRepository;
 
 @RestController
-@RequestMapping("/comments")
+@RequestMapping("/api/comments")
 public class CommentController {
 
     @Autowired
