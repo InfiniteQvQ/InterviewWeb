@@ -37,7 +37,7 @@ public class CommentController {
         // Find the user by username
         User user = userRepository.findByUsername(username);
         if (user == null) {
-            throw new RuntimeException("User not found with username: " + comment.getUsername());
+            throw new RuntimeException("User not found with username");
         }
 
         // Set the user and post for the comment
