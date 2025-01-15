@@ -26,9 +26,9 @@ public class CommentController {
     private PostRepository postRepository;
 
     // 获取某个帖子的所有评论
-    @GetMapping("/post/{postId}")
+     @GetMapping("/post/{postId}")
     public List<Comment> getCommentsByPostId(@PathVariable Long postId) {
-        return commentRepository.findByPost_PostId(postId);
+        return commentRepository.findByPost_PostId(postId);  // Correct query to fetch by post_id
     }
 
     // 创建评论
